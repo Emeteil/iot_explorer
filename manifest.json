@@ -1,0 +1,12 @@
+{
+  "domain": "iot_explorer",
+  "name": "IoT Explorer",
+  "documentation": "https://github.com/Emeteil/smart_home",
+  "issue_tracker": "https://github.com/Emeteil/smart_home/issues",
+  "dependencies": [],
+  "codeowners": ["@emeteil"],
+  "requirements": ["requests", "aiohttp"],
+  "version": "1.0.0",
+  "iot_class": "local_polling",
+  "config_flow": true
+}

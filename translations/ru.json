@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Конфигурация IoT Explorer",
+        "description": "Настройте интеграцию с IoT Explorer",
+        "data": {
+          "scan_interval": "Интервал сканирования (секунды)"
+        }
+      }
+    }
+  }
+}
