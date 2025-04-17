@@ -7,15 +7,8 @@ from typing import Any
 
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.device_registry import format_mac
 
-from .const import (
-    ATTR_SERVER,
-    ATTR_TYPE,
-    ATTR_NAME,
-    ATTR_STATUS,
-    DOMAIN,
-)
+from .const import ATTR_SERVER, ATTR_TYPE, ATTR_NAME, ATTR_STATUS, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
