@@ -32,7 +32,7 @@ class IoTExplorerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     def async_get_options_flow(
         config_entry: config_entries.ConfigEntry,
-    ) -> config_entries.OptionsFlow:
+    ) -> IoTExplorerOptionsFlow:
         """Create the options flow."""
         return IoTExplorerOptionsFlow(config_entry)
 

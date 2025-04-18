@@ -9,12 +9,12 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
-from .const import DOMAIN, DISCOVERY_INTERVAL, DEVICE_TYPES
+from .const import DOMAIN, DISCOVERY_INTERVAL
 from .device import IoTExplorerDevice
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["switch", "light", "binary_sensor"]
+PLATFORMS = ["switch"]
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up IoT Explorer from a config entry."""
