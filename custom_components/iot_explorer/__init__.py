@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, DISCOVERY_INTERVAL, FAST_DISCOVERY_INTERVAL, MAX_MISSED_UPDATES
+from .const import DOMAIN, DISCOVERY_INTERVAL, MAX_MISSED_UPDATES, FAST_DISCOVERY_INTERVAL
 from .device import discover_devices, IoTExplorerDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,7 +41,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 class IoTExplorerCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching data from the IoT Explorer devices."""
+
     def __init__(self, hass: HomeAssistant):
+        """Initialize global IoT Explorer data updater."""
         super().__init__(
             hass,
             _LOGGER,
@@ -50,6 +53,8 @@ class IoTExplorerCoordinator(DataUpdateCoordinator):
         )
         self._fast_mode = False
         self._missed_updates = 0
+        self.hass = hass
+        self.devices: dict[str, IoTExplorerDevice] = {}
 
     async def _async_update_data(self):
         try:
