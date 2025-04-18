@@ -190,16 +190,6 @@ class IoTExplorerDevice:
         """Return the IP address of the device."""
         return self._device_info["ip"]
     
-    def to_dict(self):
-        """Convert device to dict for storage."""
-        return {
-            "ip": self._device_info["ip"],
-            "mac": self._unique_id,
-            "name": self._device_info["name"],
-            "type": self._device_info["type"],
-            "available": self._available
-        }
-    
     def update(self, device_info: dict[str, Any]):
         """Update the device info."""
         self._device_info = device_info
@@ -208,7 +198,6 @@ class IoTExplorerDevice:
     def mark_unavailable(self):
         """Mark the device as unavailable."""
         self._available = False
-        self._device_info["ip"] = None
     
     async def async_turn_on(self):
         """Turn the device on."""
