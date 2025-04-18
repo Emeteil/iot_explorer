@@ -14,13 +14,16 @@ def discover_devices() -> dict[str, dict]:
     """Discover IoT Explorer devices on the network."""
     devices = {}
     
+    # Create UDP socket for discovery
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock.settimeout(2.5)
     
+    # Send discovery packet
     discovery_packet = b'IOTEXPLR_Q_V1'
     sock.sendto(discovery_packet, ('255.255.255.255', 3795))
     
+    # Collect responses
     while True:
         try:
             data, addr = sock.recvfrom(1024)
@@ -41,10 +44,12 @@ def discover_devices() -> dict[str, dict]:
 def get_device_info(ip: str) -> dict[str, Any] | None:
     """Get device info from discovered IP."""
     try:
+        # Get MAC address
         mac = get_mac_address(ip)
         if not mac:
             return None
         
+        # Get device details
         url = f"http://{ip}:3796/api/device"
         response = requests.get(url, timeout=5)
         response.raise_for_status()
@@ -71,41 +76,23 @@ def get_device_info(ip: str) -> dict[str, Any] | None:
         return None
 
 def get_mac_address(ip: str) -> str | None:
-    """Improved MAC address detection with multiple fallbacks"""
+    """Get MAC address from IP using ARP."""
     import subprocess
-    import netifaces
-    from scapy.all import ARP, Ether, srp
-    
     try:
+        # Linux/MacOS
         pid = subprocess.Popen(["arp", "-n", ip], stdout=subprocess.PIPE)
         output = pid.communicate()[0].decode()
-        for line in output.split('\n'):
+        lines = output.split('\n')
+        for line in lines:
             if ip in line:
                 parts = line.split()
                 mac = parts[2] if len(parts) > 2 else None
                 if mac and len(mac.split(':')) == 6:
                     return mac.lower()
-    except:
-        pass
-    
-    try:
-        ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff")/ARP(pdst=ip), timeout=2, verbose=0)
-        for snd, rcv in ans:
-            return rcv.sprintf(r"%Ether.src%").lower()
-    except:
-        pass
-    
-    try:
-        for iface in netifaces.interfaces():
-            addrs = netifaces.ifaddresses(iface)
-            if netifaces.AF_LINK in addrs:
-                for link in addrs[netifaces.AF_LINK]:
-                    if 'addr' in link:
-                        return link['addr'].lower()
-    except:
-        pass
-    
-    return None
+        
+        return None
+    except Exception:
+        return None
 
 class IoTExplorerDevice:
     """Representation of an IoT Explorer device."""
