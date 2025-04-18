@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, DISCOVERY_INTERVAL, MAX_MISSED_UPDATES, FAST_DISCOVERY_INTERVAL
+from .const import DOMAIN, DISCOVERY_INTERVAL
 from .device import discover_devices, IoTExplorerDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -51,40 +51,39 @@ class IoTExplorerCoordinator(DataUpdateCoordinator):
             name=DOMAIN,
             update_interval=timedelta(seconds=DISCOVERY_INTERVAL),
         )
-        self._fast_mode = False
-        self._missed_updates = 0
         self.hass = hass
         self.devices: dict[str, IoTExplorerDevice] = {}
 
     async def _async_update_data(self):
+        """Fetch data from IoT Explorer devices."""
         try:
-            discovered = await self.hass.async_add_executor_job(discover_devices)
-            current_macs = {d["mac"] for d in discovered.values()}
-            
-            for mac, device in list(self.devices.items()):
-                if mac in current_macs:
-                    device.update(discovered[mac])
-                else:
-                    self._missed_updates += 1
-                    if self._missed_updates >= MAX_MISSED_UPDATES:
-                        device.mark_unavailable()
-            
+            discovered_devices = await self.hass.async_add_executor_job(
+                discover_devices
+            )
+
+            device_registry = dr.async_get(self.hass)
             new_devices = False
-            for ip, info in discovered.items():
-                if info["mac"] not in self.devices:
-                    self.devices[info["mac"]] = IoTExplorerDevice(self.hass, info)
+
+            for device_ip, device_info in discovered_devices.items():
+                mac = device_info["mac"]
+                
+                if mac not in self.devices:
+                    self.devices[mac] = IoTExplorerDevice(self.hass, device_info)
                     new_devices = True
-            
-            if new_devices or self._missed_updates > 0:
-                self._fast_mode = True
-                self.update_interval = timedelta(seconds=FAST_DISCOVERY_INTERVAL)
-            else:
-                self._fast_mode = False
-                self.update_interval = timedelta(seconds=DISCOVERY_INTERVAL)
-                self._missed_updates = 0
-            
+                    _LOGGER.info(f"Discovered new device: {device_info['name']} ({mac})")
+                else:
+                    self.devices[mac].update(device_info)
+
+            current_macs = {d["mac"] for d in discovered_devices.values()}
+            for mac in list(self.devices.keys()):
+                if mac not in current_macs:
+                    self.devices[mac].mark_unavailable()
+
+            if new_devices:
+                _LOGGER.debug("New devices found, reloading platforms")
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+
             return list(self.devices.values())
-            
+
         except Exception as err:
-            self._missed_updates += 1
-            raise UpdateFailed(f"Error updating devices: {err}")
+            raise UpdateFailed(f"Error updating IoT Explorer devices: {err}")
