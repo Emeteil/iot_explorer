@@ -1,14 +1,18 @@
-from homeassistant.const import Platform
+"""Constants for the IoT Explorer integration."""
+from typing import Final, TypedDict
 
-DOMAIN = "iot_explorer"
-PLATFORMS = [Platform.SWITCH, Platform.SENSOR]
+DOMAIN: Final = "iot_explorer"
+DISCOVERY_INTERVAL: Final = 300  # 5 minutes
+REQUEST_TIMEOUT: Final = 2.5
+HTTP_TIMEOUT: Final = 5
 
-CONF_DEVICES = "devices"
-CONF_DEVICE_TYPES = "device_types"
-CONF_SCAN_INTERVAL = "scan_interval"
-DEFAULT_SCAN_INTERVAL = 15
+class DeviceType(TypedDict):
+    """Device type definition."""
+    status: dict
+    buttons: dict
+    imgs: dict
 
-DEVICE_CONFIGS = {
+DEVICE_TYPES: Final[dict[str, DeviceType]] = {
     "esp8266_led_on_board": {
         "imgs": {
             "светодиод": "/static/images/esp8266_led_on_board.png"
@@ -63,3 +67,5 @@ DEVICE_CONFIGS = {
         }
     }
 }
+
+DEFAULT_PORT: Final = 3796

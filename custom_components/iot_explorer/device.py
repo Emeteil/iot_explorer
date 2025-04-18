@@ -1,88 +1,238 @@
+"""Representation of an IoT Explorer device."""
 from __future__ import annotations
 
 import logging
-import aiohttp
-import async_timeout
+import requests
+import socket
+import uuid
 from typing import Any
 
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import ATTR_SERVER, ATTR_TYPE, ATTR_NAME, ATTR_STATUS, DOMAIN
+from .const import (
+    DOMAIN,
+    DEVICE_TYPES,
+    DEFAULT_PORT,
+    REQUEST_TIMEOUT,
+    HTTP_TIMEOUT,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-class IoTExplorerDevice:
-    def __init__(self, hass, device_config: dict, device_types: dict) -> None:
-        self.hass = hass
-        self._config = device_config
-        self._types = device_types
-        self._name = device_config["name"]
-        self._type = device_config["type"]
-        self._server = device_config["server"]
-        self._status = None
-        self._available = False
+def discover_devices() -> dict[str, dict]:
+    """Discover IoT Explorer devices on the network."""
+    devices = {}
+    
+    # Create a UDP socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    sock.settimeout(REQUEST_TIMEOUT)
+    
+    # Send discovery packet to all interfaces
+    broadcast_addresses = _get_broadcast_addresses()
+    discovery_packet = b'IOTEXPLR_Q_V1'
+    
+    for addr in broadcast_addresses:
+        try:
+            sock.sendto(discovery_packet, (addr, 3795))
+        except socket.error:
+            continue
+    
+    # Collect responses
+    while True:
+        try:
+            data, addr = sock.recvfrom(1024)
+            if data == b'IOTEXPLR_A_V1':
+                ip = addr[0]
+                try:
+                    device_info = _get_device_info(ip)
+                    if device_info:
+                        devices[ip] = device_info
+                except Exception as e:
+                    _LOGGER.warning(f"Error getting device info from {ip}: {e}")
+        except socket.timeout:
+            break
+    
+    sock.close()
+    return devices
+
+def _get_broadcast_addresses() -> list[str]:
+    """Get all broadcast addresses on all interfaces."""
+    import netifaces
+    broadcast_addrs = []
+    
+    for interface in netifaces.interfaces():
+        try:
+            addrs = netifaces.ifaddresses(interface)
+            if netifaces.AF_INET in addrs:
+                for addr_info in addrs[netifaces.AF_INET]:
+                    if 'broadcast' in addr_info:
+                        broadcast_addrs.append(addr_info['broadcast'])
+        except (ValueError, OSError):
+            continue
+    
+    return broadcast_addrs
+
+def _get_device_info(ip: str) -> dict[str, Any] | None:
+    """Get device info from a discovered IP."""
+    try:
+        # First get MAC address
+        mac = _get_mac_address(ip)
+        if not mac:
+            return None
         
-        self._device_info = DeviceInfo(
-            identifiers={(DOMAIN, self.unique_id)},
-            name=self._name,
-            manufacturer="IoT Explorer",
-            model=self._type,
+        # Then get device details
+        url = f"http://{ip}:{DEFAULT_PORT}/api/device"
+        response = requests.get(url, timeout=HTTP_TIMEOUT)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data["status"] != "successful":
+            return None
+        
+        return {
+            "ip": ip,
+            "mac": mac,
+            "name": data["device_name"],
+            "type": data["device_type"],
+            "server": data["server"],
+            "main_command": data["main_command"],
+            "model": data["device_type"],
+            "manufacturer": "IoT Explorer",
+            "sw_version": "1.0",
+            "available": True,
+            "device_data": data
+        }
+    except requests.exceptions.RequestException as e:
+        _LOGGER.warning(f"Error getting device info from {ip}: {e}")
+        return None
+
+def _get_mac_address(ip: str) -> str | None:
+    """Get MAC address from IP using ARP."""
+    import subprocess
+    try:
+        # Linux/MacOS
+        pid = subprocess.Popen(["arp", "-n", ip], stdout=subprocess.PIPE)
+        output = pid.communicate()[0].decode()
+        lines = output.split('\n')
+        for line in lines:
+            if ip in line:
+                parts = line.split()
+                mac = parts[2] if len(parts) > 2 else None
+                if mac and len(mac.split(':')) == 6:
+                    return mac.lower()
+        
+        # Windows (if above fails)
+        pid = subprocess.Popen(["arp", "-a", ip], stdout=subprocess.PIPE)
+        output = pid.communicate()[0].decode()
+        lines = output.split('\n')
+        for line in lines:
+            if ip in line:
+                parts = line.split()
+                mac = parts[1] if len(parts) > 1 else None
+                if mac and len(mac.split('-')) == 6:
+                    return mac.lower().replace('-', ':')
+        
+        return None
+    except Exception:
+        return None
+
+class IoTExplorerDevice:
+    """Representation of an IoT Explorer device."""
+    
+    def __init__(self, hass, device_info: dict[str, Any]):
+        """Initialize the device."""
+        self.hass = hass
+        self._device_info = device_info
+        self._available = True
+        self._unique_id = device_info["mac"]
+        
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._unique_id)},
+            name=self._device_info["name"],
+            manufacturer=self._device_info["manufacturer"],
+            model=self._device_info["model"],
+            sw_version=self._device_info["sw_version"],
         )
     
     @property
-    def unique_id(self) -> str:
-        return f"{self._type}_{self._name}_{self._server.replace(':', '_')}"
-    
-    @property
-    def device_info(self) -> DeviceInfo:
-        return self._device_info
-    
-    @property
-    def status(self) -> Any:
-        return self._status
-    
-    @property
     def available(self) -> bool:
+        """Return True if device is available."""
         return self._available
     
-    async def async_update(self) -> None:
-        try:
-            status_config = self._types[self._type]["status"]
-            url = f"http://{self._server}{status_config['route']}"
-            
-            async with async_timeout.timeout(10):
-                async with aiohttp.ClientSession() as session:
-                    async with session.request(
-                        status_config["method"],
-                        url
-                    ) as response:
-                        data = await response.json()
-                        self._status = data[status_config["status_in_response"]]
-                        self._available = True
-        
-        except Exception as ex:
-            _LOGGER.warning("Error updating %s: %s", self._name, str(ex))
-            self._available = False
+    @property
+    def unique_id(self) -> str:
+        """Return a unique ID."""
+        return self._unique_id
     
-    async def async_send_command(self, command: str) -> bool:
-        try:
-            button_config = self._types[self._type]["buttons"][command]
-            url = f"http://{self._server}{button_config['route']}"
-            
-            async with async_timeout.timeout(10):
-                async with aiohttp.ClientSession() as session:
-                    async with session.request(
-                        button_config["method"],
-                        url
-                    ) as response:
-                        data = await response.json()
-                        if data["status"] == "successful":
-                            self._status = data[button_config["status_in_response"]]
-                            return True
-            
+    @property
+    def name(self) -> str:
+        """Return the name of the device."""
+        return self._device_info["name"]
+    
+    @property
+    def device_type(self) -> str:
+        """Return the device type."""
+        return self._device_info["type"]
+    
+    @property
+    def ip_address(self) -> str:
+        """Return the IP address of the device."""
+        return self._device_info["ip"]
+    
+    def update(self, device_info: dict[str, Any]):
+        """Update the device info."""
+        self._device_info = device_info
+        self._available = True
+    
+    def mark_unavailable(self):
+        """Mark the device as unavailable."""
+        self._available = False
+    
+    async def async_turn_on(self):
+        """Turn the device on."""
+        device_type = DEVICE_TYPES.get(self.device_type)
+        if not device_type:
+            _LOGGER.error(f"Unknown device type: {self.device_type}")
             return False
         
-        except Exception as ex:
-            _LOGGER.warning("Error sending command to %s: %s", self._name, str(ex))
+        try:
+            url = f"http://{self.ip_address}:{DEFAULT_PORT}{device_type['buttons']['toggle']['route']}"
+            response = await self.hass.async_add_executor_job(
+                requests.get, url, {"timeout": HTTP_TIMEOUT}
+            )
+            data = response.json()
+            return data.get(device_type['buttons']['toggle']['status_in_response'], False)
+        except requests.exceptions.RequestException as e:
+            _LOGGER.error(f"Error turning on device {self.name}: {e}")
+            self._available = False
             return False
+    
+    async def async_turn_off(self):
+        """Turn the device off."""
+        # For toggle devices, turning off is the same as turning on
+        return await self.async_turn_on()
+    
+    async def async_update_status(self):
+        """Update the status of the device."""
+        device_type = DEVICE_TYPES.get(self.device_type)
+        if not device_type:
+            _LOGGER.error(f"Unknown device type: {self.device_type}")
+            return None
+        
+        try:
+            url = f"http://{self.ip_address}:{DEFAULT_PORT}{device_type['status']['route']}"
+            response = await self.hass.async_add_executor_job(
+                requests.get, url, {"timeout": HTTP_TIMEOUT}
+            )
+            data = response.json()
+            self._available = True
+            return data.get(device_type['status']['status_in_response'])
+        except requests.exceptions.RequestException as e:
+            _LOGGER.error(f"Error updating status for device {self.name}: {e}")
+            self._available = False
+            return None

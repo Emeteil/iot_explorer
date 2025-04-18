@@ -1,7 +1,10 @@
-discover_devices:
-  description: Discover IoT Explorer devices on the network
+scan:
+  description: "Force a scan for new IoT Explorer devices"
   fields:
-    entry_id:
-      description: The config entry ID
-      example: 1234567890abcdef1234567890abcdef
-      required: true
+    full_scan:
+      description: "Perform a full network scan (slower but more thorough)"
+      required: false
+      example: true
+      default: false
+      selector:
+        boolean:

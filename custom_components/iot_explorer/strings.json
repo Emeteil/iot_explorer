@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "IoT Explorer",
+        "description": "Set up the IoT Explorer integration to discover and control your IoT devices."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only a single configuration of IoT Explorer is allowed."
+    }
+  }
+}

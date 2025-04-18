@@ -1,13 +1,72 @@
 {
+  "title": "IoT Explorer",
   "config": {
     "step": {
       "user": {
-        "title": "Конфигурация IoT Explorer",
-        "description": "Настройте интеграцию с IoT Explorer",
-        "data": {
-          "scan_interval": "Интервал сканирования (секунды)"
+        "title": "IoT Explorer",
+        "description": "Set up the IoT Explorer integration to discover and control your IoT devices."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only a single configuration of IoT Explorer is allowed."
+    },
+    "progress": {
+      "discovering": "Discovering IoT devices..."
+    }
+  },
+  "device_automation": {
+    "trigger_type": {
+      "turned_on": "{entity_name} turned on",
+      "turned_off": "{entity_name} turned off",
+      "button_pressed": "{entity_name} button pressed"
+    }
+  },
+  "state": {
+    "on": "On",
+    "off": "Off",
+    "unavailable": "Unavailable"
+  },
+  "system_health": {
+    "info": {
+      "devices": "Devices",
+      "last_discovery": "Last discovery",
+      "discovery_method": "Discovery method"
+    }
+  },
+  "services": {
+    "scan": {
+      "name": "Scan for devices",
+      "description": "Force a scan for new IoT Explorer devices",
+      "fields": {
+        "full_scan": {
+          "name": "Full scan",
+          "description": "Perform a full network scan (slower but more thorough)"
         }
       }
     }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "IoT Explorer Options",
+        "description": "Configure IoT Explorer options",
+        "data": {
+          "scan_interval": "Scan interval (minutes)",
+          "timeout": "Discovery timeout (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "switch": {
+      "toggle": {
+        "name": "Toggle"
+      }
+    }
+  },
+  "errors": {
+    "cannot_connect": "Failed to connect",
+    "invalid_auth": "Invalid authentication",
+    "unknown": "Unknown error"
   }
 }

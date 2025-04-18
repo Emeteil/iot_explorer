@@ -1,4 +1,6 @@
 {
-    "name": "IoT Explorer",
-    "render_readme": false
+  "name": "IoT Explorer",
+  "domains": ["iot_explorer"],
+  "homeassistant": "2023.1.0",
+  "render_readme": true
 }
