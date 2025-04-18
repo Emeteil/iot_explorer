@@ -103,19 +103,44 @@ def _get_device_info(ip: str) -> dict[str, Any] | None:
         return None
 
 def _get_mac_address(ip: str) -> str | None:
-    """Get MAC address from IP using ARP."""
+    """Get MAC address from IP using ARP. 
+    If not found in ARP cache, sends an ARP request (using arping or ping)."""
     import subprocess
-    try:
-        pid = subprocess.Popen(["arp", "-n", ip], stdout=subprocess.PIPE)
-        output = pid.communicate()[0].decode()
-        lines = output.split('\n')
-        for line in lines:
+    import re
+
+    def _parse_mac_from_arp_output(output: str, ip: str) -> str | None:
+        """Helper to parse MAC from arp command output."""
+        for line in output.split('\n'):
             if ip in line:
-                parts = line.split()
-                mac = parts[2] if len(parts) > 2 else None
-                if mac and len(mac.split(':')) == 6:
-                    return mac.lower()        
+                parts = re.split(r'\s+', line.strip())
+                if len(parts) >= 3:
+                    mac = parts[2]
+                    if re.match(r'^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$', mac):
+                        return mac.lower()
         return None
+
+    try:
+        arp_output = subprocess.run(["arp", "-n", ip], 
+                                   capture_output=True, 
+                                   text=True).stdout
+        mac = _parse_mac_from_arp_output(arp_output, ip)
+        if mac:
+            return mac
+
+        try:
+            subprocess.run(["arping", "-c", "1", ip], 
+                          capture_output=True, 
+                          timeout=2)
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            subprocess.run(["ping", "-c", "1", ip], 
+                          capture_output=True, 
+                          timeout=2)
+
+        arp_output = subprocess.run(["arp", "-n", ip], 
+                                   capture_output=True, 
+                                   text=True).stdout
+        return _parse_mac_from_arp_output(arp_output, ip)
+
     except Exception:
         return None
 
@@ -213,6 +238,5 @@ class IoTExplorerDevice:
             self._available = True
             return data.get(device_type['status']['status_in_response'])
         except requests.exceptions.RequestException as e:
-            _LOGGER.error(f"Error updating status for device {self.name}: {e}")
             self._available = False
             return None
