@@ -22,8 +22,7 @@ async def async_setup_entry(
 
     entities = []
     for device in devices:
-        if device.device_type in ["esp8266_led_on_board", "relay"]:
-            entities.append(IoTExplorerSwitch(coordinator, device))
+        entities.append(IoTExplorerSwitch(coordinator, device))
 
     async_add_entities(entities)
 
@@ -35,7 +34,7 @@ class IoTExplorerSwitch(SwitchEntity):
         self._coordinator = coordinator
         self._device = device
         self._attr_name = device.name
-        self._attr_unique_id = device.unique_id
+        self._attr_unique_id = f"{device.unique_id}_switch"
         self._attr_device_info = device.device_info
         self._attr_is_on = False
 
@@ -47,7 +46,7 @@ class IoTExplorerSwitch(SwitchEntity):
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn the entity on."""
         result = await self._device.async_turn_on()
-        if result:
+        if result is not None:
             self._attr_is_on = True
             self.async_write_ha_state()
 

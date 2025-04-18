@@ -2,7 +2,7 @@
 from typing import Final, TypedDict
 
 DOMAIN: Final = "iot_explorer"
-DISCOVERY_INTERVAL: Final = 100
+DISCOVERY_INTERVAL: Final = 70
 REQUEST_TIMEOUT: Final = 2.5
 HTTP_TIMEOUT: Final = 5
 

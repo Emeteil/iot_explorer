@@ -50,29 +50,22 @@ class IoTExplorerCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self):
         """Fetch data from IoT Explorer devices."""
         try:
-            # Discover devices
             discovered_devices = await self.hass.async_add_executor_job(
                 self._discover_devices
             )
 
-            # Update existing devices or add new ones
-            for device_ip, device_info in discovered_devices.items():
+            for _, device_info in discovered_devices.items():
                 if device_info["mac"] in self.devices:
-                    # Update existing device
                     self.devices[device_info["mac"]].update(device_info)
                 else:
-                    # Add new device
                     self.devices[device_info["mac"]] = IoTExplorerDevice(
                         self.hass, device_info
                     )
 
-            # Remove devices that are no longer present
             current_macs = {device_info["mac"] for device_info in discovered_devices.values()}
             for mac in list(self.devices.keys()):
                 if mac not in current_macs:
                     self.devices[mac].mark_unavailable()
-                    # Optionally remove after some time if still unavailable
-                    # self.devices.pop(mac)
 
             return list(self.devices.values())
 

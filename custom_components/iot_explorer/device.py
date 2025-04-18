@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 import requests
 import socket
-import uuid
 from typing import Any
 
 from homeassistant.helpers.entity import DeviceInfo
@@ -24,12 +23,10 @@ def discover_devices() -> dict[str, dict]:
     """Discover IoT Explorer devices on the network."""
     devices = {}
     
-    # Create a UDP socket
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     sock.settimeout(REQUEST_TIMEOUT)
     
-    # Send discovery packet to all interfaces
     broadcast_addresses = _get_broadcast_addresses()
     discovery_packet = b'IOTEXPLR_Q_V1'
     
@@ -39,7 +36,6 @@ def discover_devices() -> dict[str, dict]:
         except socket.error:
             continue
     
-    # Collect responses
     while True:
         try:
             data, addr = sock.recvfrom(1024)
@@ -77,12 +73,10 @@ def _get_broadcast_addresses() -> list[str]:
 def _get_device_info(ip: str) -> dict[str, Any] | None:
     """Get device info from a discovered IP."""
     try:
-        # First get MAC address
         mac = _get_mac_address(ip)
         if not mac:
             return None
         
-        # Then get device details
         url = f"http://{ip}:{DEFAULT_PORT}/api/device"
         response = requests.get(url, timeout=HTTP_TIMEOUT)
         response.raise_for_status()
@@ -112,7 +106,6 @@ def _get_mac_address(ip: str) -> str | None:
     """Get MAC address from IP using ARP."""
     import subprocess
     try:
-        # Linux/MacOS
         pid = subprocess.Popen(["arp", "-n", ip], stdout=subprocess.PIPE)
         output = pid.communicate()[0].decode()
         lines = output.split('\n')
@@ -121,19 +114,7 @@ def _get_mac_address(ip: str) -> str | None:
                 parts = line.split()
                 mac = parts[2] if len(parts) > 2 else None
                 if mac and len(mac.split(':')) == 6:
-                    return mac.lower()
-        
-        # Windows (if above fails)
-        pid = subprocess.Popen(["arp", "-a", ip], stdout=subprocess.PIPE)
-        output = pid.communicate()[0].decode()
-        lines = output.split('\n')
-        for line in lines:
-            if ip in line:
-                parts = line.split()
-                mac = parts[1] if len(parts) > 1 else None
-                if mac and len(mac.split('-')) == 6:
-                    return mac.lower().replace('-', ':')
-        
+                    return mac.lower()        
         return None
     except Exception:
         return None
@@ -214,7 +195,6 @@ class IoTExplorerDevice:
     
     async def async_turn_off(self):
         """Turn the device off."""
-        # For toggle devices, turning off is the same as turning on
         return await self.async_turn_on()
     
     async def async_update_status(self):
